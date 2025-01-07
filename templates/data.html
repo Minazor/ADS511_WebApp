@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Veri Yüklendi</h1>
+{% if tests %}
+<p>Uygun Hipotez Testleri:</p>
+<form method="post">
+    <div class="mb-3">
+        <select class="form-select" name="test_type">
+            {% for test_val, test_name in tests %}
+            <option value="{{ test_val }}">{{ test_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Testi Seç</button>
+</form>
+{% else %}
+<p>Bu veri seti için tanımlı test bulunamadı.</p>
+{% endif %}
+{% endblock %}

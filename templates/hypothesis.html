@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Hipotez Tanımlama</h1>
+<p>Seçiniz:</p>
+<form method="post">
+    <div class="mb-3">
+        <select class="form-select" name="hypo_type">
+            <option value="" disabled selected>Hipotez tipi seçin</option>
+            {% for val, name in hypotheses %}
+            <option value="{{val}}">{{name}}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Devam</button>
+</form>
+{% endblock %}

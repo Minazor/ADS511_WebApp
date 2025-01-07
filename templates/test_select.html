@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Test Seçin</h1>
+<form method="post">
+    <div class="mb-3">
+        <select class="form-select" name="test_type">
+            <option value="" disabled selected>Test seçin</option>
+            {% for t_id, t_name in tests %}
+            <option value="{{ t_id }}">{{ t_name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-secondary">Devam</button>
+</form>
+{% endblock %}
