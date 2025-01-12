@@ -128,27 +128,48 @@ def one_sample_test():
     data = df[numeric_col].dropna()
     alpha = 0.05
 
-    result_text = f"One-Sample Test for {numeric_col} vs μ₀={hypoth_value}\n"
+    # Tüm adımları birleştirmek için sonuç metni
+    result_steps = []
+
+    result_steps.append(f"One-Sample Test for {numeric_col} vs μ₀={hypoth_value}")
+    result_steps.append(f"Sample size: {len(data)}")
+
+    # Normallik testi sonucu
+    if normality_p < alpha:
+        result_steps.append(
+            f"Shapiro-Wilk normality test result: p={normality_p:.4f} (Not Normal)"
+        )
+    else:
+        result_steps.append(
+            f"Shapiro-Wilk normality test result: p={normality_p:.4f} (Normal)"
+        )
 
     if known_variance == "yes":
-        # Known Population Variance varsa, Z-test uygulaması
-        sigma = 1.0  # Varsayılan bir sigma değeri, gerçekte dışarıdan gelmelidir
+        # Z-test uygulama
+        sigma = 1.0  # Varsayılan sigma
         z_stat = (np.mean(data) - hypoth_value) / (sigma / np.sqrt(len(data)))
         p_val = 2 * (1 - stats.norm.cdf(abs(z_stat)))
-        result_text += f"One-Sample Z-test: Z={z_stat:.4f}, p={p_val:.4f}\n"
+        result_steps.append(f"Known variance selected: Applying Z-test.")
+        result_steps.append(f"Z={z_stat:.4f}, p={p_val:.4f}")
     else:
-        # Known Variance yoksa, normalite kontrolü ile devam
         if normality_p < alpha:
-            # Normal dağılım değil => non-parametrik test
+            # Non-parametrik test
             diff = data - hypoth_value
             stat, pval = stats.wilcoxon(diff)
-            result_text += f"Non-parametrik Wilcoxon Signed-Rank uygulanıyor.\n"
-            result_text += f"stat={stat:.4f}, p={pval:.4f}\n"
+            result_steps.append(
+                f"Normality assumption violated: Applying Wilcoxon Signed-Rank test."
+            )
+            result_steps.append(f"stat={stat:.4f}, p={pval:.4f}")
         else:
-            # Normal dağılım => T-test
+            # T-test
             stat, pval = stats.ttest_1samp(data, hypoth_value)
-            result_text += f"One-Sample T-test: T={stat:.4f}, p={pval:.4f}\n"
+            result_steps.append(
+                f"Normality assumption satisfied: Applying One-Sample T-test."
+            )
+            result_steps.append(f"T={stat:.4f}, p={pval:.4f}")
 
+    # Tüm adımları birleştirip göndermek
+    result_text = "\n".join(result_steps)
     return render_template("result.html", result=result_text)
 
 
@@ -211,11 +232,6 @@ def two_sample_columns():
 
 @app.route("/two_sample_test")
 def two_sample_test():
-    """
-    2 sample test uygulama:
-      - Paired => normal => paired t-test, normal değil => Wilcoxon Signed Rank
-      - Independent => normal & var.homogeneous => two-sample t-test, yoksa mann-whitney
-    """
     filename = session.get("filename")
     is_paired = session.get("is_paired")
 
@@ -226,7 +242,7 @@ def two_sample_test():
     df = pd.read_csv(filepath)
 
     alpha = 0.05
-    result_text = ""
+    result_steps = []
 
     if is_paired == "yes":
         col1 = session.get("numeric_col_1")
@@ -234,60 +250,83 @@ def two_sample_test():
         data1 = df[col1].dropna()
         data2 = df[col2].dropna()
 
-        # Normalite?
+        result_steps.append(f"Paired samples selected: {col1} vs {col2}")
+        result_steps.append(f"Sample sizes: {len(data1)}, {len(data2)}")
+
+        # Normallik kontrolü
         w1, p1 = check_normality(data1)
         w2, p2 = check_normality(data2)
         normal = True
         if (p1 is not None and p1 < alpha) or (p2 is not None and p2 < alpha):
             normal = False
+        result_steps.append(
+            f"Normality test results: {col1} (p={p1:.4f}), {col2} (p={p2:.4f})"
+        )
 
         if normal:
             # Paired T-test
             stat, pval = stats.ttest_rel(data1, data2)
-            result_text += (
-                f"Paired T-test ({col1} vs {col2}): t={stat:.4f}, p={pval:.4f}"
+            result_steps.append(
+                f"Normality assumption satisfied: Applying Paired T-test."
             )
+            result_steps.append(f"t={stat:.4f}, p={pval:.4f}")
         else:
             # Wilcoxon Signed Rank
             stat, pval = stats.wilcoxon(data1, data2)
-            result_text += f"Wilcoxon Signed-Rank Test (Paired, non-param): stat={stat:.4f}, p={pval:.4f}"
-
+            result_steps.append(
+                f"Normality assumption violated: Applying Wilcoxon Signed-Rank test."
+            )
+            result_steps.append(f"stat={stat:.4f}, p={pval:.4f}")
     else:
-        # Independent
+        # Independent samples test
         numeric_col = session.get("numeric_col")
         cat_col = session.get("cat_col")
         unique_vals = df[cat_col].dropna().unique()
         if len(unique_vals) != 2:
-            return "Bu kategorik kolon 2 farklı değer içermiyor!"
+            return "This categorical column does not have exactly 2 groups!"
 
         g1, g2 = unique_vals[0], unique_vals[1]
         data1 = df[df[cat_col] == g1][numeric_col].dropna()
         data2 = df[df[cat_col] == g2][numeric_col].dropna()
 
-        # Normalite
+        result_steps.append(f"Independent samples selected: {g1} vs {g2}")
+        result_steps.append(f"Sample sizes: {len(data1)}, {len(data2)}")
+
+        # Normallik kontrolü
         w1, p1 = check_normality(data1)
         w2, p2 = check_normality(data2)
         normal = True
         if (p1 is not None and p1 < alpha) or (p2 is not None and p2 < alpha):
             normal = False
 
-        # Varyans homojenliği
+        result_steps.append(
+            f"Normality test results: {g1} (p={p1:.4f}), {g2} (p={p2:.4f})"
+        )
+
+        # Varyans homojenliği kontrolü
         stat_levene, p_levene = check_variances(data1, data2)
-        equal_var = True
-        if p_levene < alpha:
-            equal_var = False
+        equal_var = p_levene >= alpha
+        result_steps.append(
+            f"Levene's test for variance homogeneity: p={p_levene:.4f} "
+            f"({'Homogeneous' if equal_var else 'Not Homogeneous'})"
+        )
 
         if normal:
             # Two-sample T-test
             stat, pval = stats.ttest_ind(data1, data2, equal_var=equal_var)
-            result_text += f"Two-sample T-test (independent) {g1} vs {g2}, T={stat:.4f}, p={pval:.4f}, equal_var={equal_var}"
+            result_steps.append(
+                f"Normality assumption satisfied: Applying Two-Sample T-test."
+            )
+            result_steps.append(f"T={stat:.4f}, p={pval:.4f}, equal_var={equal_var}")
         else:
             # Mann-Whitney
             stat, pval = stats.mannwhitneyu(data1, data2, alternative="two-sided")
-            result_text += (
-                f"Mann-Whitney U Test: {g1} vs {g2}, U={stat:.4f}, p={pval:.4f}"
+            result_steps.append(
+                f"Normality assumption violated: Applying Mann-Whitney U Test."
             )
+            result_steps.append(f"U={stat:.4f}, p={pval:.4f}")
 
+    result_text = "\n".join(result_steps)
     return render_template("result.html", result=result_text)
 
 
